@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include "prey.h"
 
-__device__ void Prey::initialise(double mass, double x0, double x1)
+__device__ void Prey::initialise(float mass, float x0, float x1)
 {   
     // Mass.
     m = mass;
