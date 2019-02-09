@@ -1,5 +1,4 @@
 #include "predator.h"
-#include "forces.h"
 
 __host__ void Predator::initialise(float kappa, float x0, float x1, float v0, float v1)
 {   
