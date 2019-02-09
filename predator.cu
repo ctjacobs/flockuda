@@ -1,7 +1,7 @@
-#include <stdlib.h>
 #include "predator.h"
+#include "forces.h"
 
-__device__ void Predator::initialise(float kappa, float x0, float x1, float v0, float v1)
+__host__ void Predator::initialise(float kappa, float x0, float x1, float v0, float v1)
 {   
     // Strength of bias.
     k = kappa;
@@ -19,7 +19,7 @@ __device__ void Predator::initialise(float kappa, float x0, float x1, float v0, 
     return;
 }
 
-__device__ void Predator::save()
+__host__ void Predator::save()
 {   
     // Save information from the previous timestep.
     xold[0] = x[0];
@@ -27,5 +27,29 @@ __device__ void Predator::save()
     vold[0] = v[0];
     vold[1] = v[1];
 
+    return;
+}
+
+__host__ void initialise_predator(Predator *p)
+{
+    float kappa = 0.5;
+    p->initialise(kappa, 0, 0, 0.5, 0.5);
+    return;
+}
+
+__host__ void write_predator(H5PartFile *output, Predator *p, int it)
+{
+    float x[1] = {p->x[0]};
+    float y[1] = {p->x[1]};
+    
+    H5PartSetStep(output, it);
+    H5PartWriteDataFloat32(output, "PredatorX", x);
+    H5PartWriteDataFloat32(output, "PredatorY", y);
+    return;
+}
+
+__host__ void save_predator(Predator *p)
+{
+    p->save();
     return;
 }

@@ -1,3 +1,5 @@
+#include <H5Part.h>
+
 class Predator
 {
     public:
@@ -10,6 +12,10 @@ class Predator
         float v[2];  // Velocity of the predator.
         float vold[2];  // Velocity of the predator at the previous timestep.
 
-        __device__ void initialise(float kappa, float x0, float x1, float v0, float v1);
-        __device__ void save();
+        __host__ void initialise(float kappa, float x0, float x1, float v0, float v1);
+        __host__ void save();
 };
+
+__host__ void initialise_predator(Predator *p);
+__host__ void write_predator(H5PartFile *output, Predator *p, int it);
+__host__ void save_predator(Predator *p);

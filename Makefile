@@ -8,11 +8,14 @@ CCFLAGS=-I. -L. -I$(HDF5_INCLUDE) -L$(HDF5_LIB) -I"/home/christian/Downloads/H5P
 
 all: flockuda
 
-flockuda: main.o predator.o prey.o
-	$(CC) -o flockuda main.o predator.o prey.o $(CCFLAGS)
+flockuda: main.o predator.o prey.o forces.o
+	$(CC) -o flockuda main.o predator.o prey.o forces.o $(CCFLAGS)
 
 main.o: main.cu
 	$(CC) -dc main.cu $(CCFLAGS)
+
+forces.o: forces.cu
+	$(CC) -dc forces.cu $(CCFLAGS)
 
 predator.o: predator.cu
 	$(CC) -dc predator.cu $(CCFLAGS)
