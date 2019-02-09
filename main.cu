@@ -8,14 +8,20 @@ Copyright (C) 2019 Christian Thomas Jacobs
 #include <H5Part.h>
 #include <cuda.h>
 #include <curand.h>
+#include "predator.h"
 #include "prey.h"
 using namespace std;
 
 __global__ void initialise(Prey *p, float *xrandom, float *yrandom, int nprey, float Lx, float Ly);
 __global__ void prey_velocity(Prey *p, int nprey, float dt);
+__device__ float prey_alignment(Prey *p, int nprey, int dimension);
+__device__ float prey_attraction(Prey *p, int nprey, int dimension);
+__device__ float prey_repulsion(Prey *p, int nprey, int dimension);
+__device__ float prey_friction(Prey *p, int nprey, int dimension);
 __global__ void prey_location(Prey *p, int nprey, float dt);
 __global__ void save(Prey *p, int nprey);
-__host__ void write(H5PartFile *output, Prey *p, int nprey, int it);
+__host__ void write_prey(H5PartFile *output, Prey *p, int nprey, int it);
+__host__ void write_predator(H5PartFile *output, Predator *p, int it);
 
 int main()
 {
@@ -29,10 +35,14 @@ int main()
     float t = 0.0;
     float dt = 0.5;
     int it = 0;
-    int nt = 5;
+    int nt = 1000;
+
+    // Predator.
+    Predator *predator;
+    cudaMallocManaged(&predator, sizeof(Predator));
 
     // Prey.
-    int nprey = 2048;
+    int nprey = 200;
     Prey *prey;
     cudaMallocManaged(&prey, nprey*sizeof(Prey));
 
@@ -47,35 +57,42 @@ int main()
     curandGenerateUniform(generator, xrandom, nprey);
     curandGenerateUniform(generator, yrandom, nprey);
 
-    // File.
-    H5PartFile *output = H5PartOpenFile("prey.h5part", H5PART_WRITE);
-    H5PartSetNumParticles(output, nprey);
+    // Files.
+    H5PartFile *output_prey = H5PartOpenFile("prey.h5part", H5PART_WRITE);
+    H5PartSetNumParticles(output_prey, nprey);
+    H5PartFile *output_predator = H5PartOpenFile("predator.h5part", H5PART_WRITE);
+    H5PartSetNumParticles(output_predator, 1);
+
 
     // Initialise.
-    initialise<<<1024, 1024>>>(prey, xrandom, yrandom, nprey, Lx, Ly);
+    initialise<<<200, 200>>>(prey, xrandom, yrandom, nprey, Lx, Ly);
     cudaDeviceSynchronize();
 
-    write(output, prey, nprey, it);
+    write_prey(output_prey, prey, nprey, it);
+    write_predator(output_predator, predator, it);
 
+    
     while(it < nt)
     {
         cout << it << "\t" << t << endl;
 
-        H5PartSetStep(output, it);
+        H5PartSetStep(output_prey, it);
+        H5PartSetStep(output_predator, it);
 
         // Compute prey velocities.
-        prey_velocity<<<1024, 1024>>>(prey, nprey, dt);
+        prey_velocity<<<200, 200>>>(prey, nprey, dt);
         cudaDeviceSynchronize();
 
-        cout << prey[0].x[0] << " " << prey[0].x[1] << endl;
+        cout << prey[0].v[0] << " " << prey[0].v[1] << endl;
 
-        prey_location<<<1024, 1024>>>(prey, nprey, dt);
+        prey_location<<<200, 200>>>(prey, nprey, dt);
         cudaDeviceSynchronize();
 
-        save<<<1024, 1024>>>(prey, nprey);
+        save<<<200, 200>>>(prey, nprey);
         cudaDeviceSynchronize();
 
-        write(output, prey, nprey, it);
+        write_prey(output_prey, prey, nprey, it);
+        write_predator(output_predator, predator, it);
 
         // Update time.
         it += 1;
@@ -83,13 +100,15 @@ int main()
     }
 
     // Free unified memory.
+    cudaFree(predator);
     cudaFree(prey);
     curandDestroyGenerator(generator);
     cudaFree(xrandom);
     cudaFree(yrandom);
 
-    // Close output stream.
-    H5PartCloseFile(output);
+    // Close output streams.
+    H5PartCloseFile(output_prey);
+    H5PartCloseFile(output_predator);
 
     return 0;
 }
@@ -104,14 +123,84 @@ __global__ void prey_velocity(Prey *p, int nprey, float dt)
         for(int d=0; d<2; ++d)
         {
             // Compute force terms.
-            f[d] = 100.0;
+            f[d] = prey_alignment(p, nprey, d) + prey_attraction(p, nprey, d) + prey_repulsion(p, nprey, d) - prey_friction(p, nprey, d);
 
             // Compute velocity using F = ma.
-            p[i].v[d] = (1.0/dt)*p[i].vold[d] + (1.0/p[i].m)*(f[d]);
+            p[i].v[d] = dt*(p[i].vold[d] + (1.0/p[i].m)*(f[d]));
         }
     }
 
     return;
+}
+
+__device__ float prey_alignment(Prey *p, int nprey, int dimension)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    float g = 0.5;
+    float sum = 0.0;
+    float magnitude = 0.0;
+    for(int j=0; j<nprey; ++j)
+    {
+        if(i != j)
+        {
+            magnitude = sqrt(pow(p[i].x[0] - p[j].x[0], 2) + pow(p[i].x[1] - p[j].x[1], 2));
+            if(fabs(p[j].v[dimension]) != 0)
+            {
+                sum += (g/magnitude)*(p[j].v[dimension]/fabs(p[j].v[dimension]));
+            }
+        }
+    }
+
+    return sum;
+}
+
+__device__ float prey_attraction(Prey *p, int nprey, int dimension)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    float catt = 7.0;
+    float latt = 100.0;
+    float sum = 0.0;
+    float magnitude = 0.0;
+    float f = 0.0;
+    for(int j=0; j<nprey; ++j)
+    {
+        if(i != j)
+        {
+            magnitude = sqrt(pow(p[i].x[0] - p[j].x[0], 2) + pow(p[i].x[1] - p[j].x[1], 2));
+            f = (p[i].x[dimension] - p[j].x[dimension])/magnitude;
+            sum += exp(-magnitude/latt)*f;
+        }
+    }
+
+    return catt*sum;
+}
+
+__device__ float prey_repulsion(Prey *p, int nprey, int dimension)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    float crep = 10.0;
+    float lrep = 150.0;
+    float sum = 0.0;
+    float magnitude = 0.0;
+    float f = 0.0;
+    for(int j=0; j<nprey; ++j)
+    {
+        if(i != j)
+        {
+            magnitude = sqrt(pow(p[i].x[0] - p[j].x[0], 2) + pow(p[i].x[1] - p[j].x[1], 2));
+            f = (p[i].x[dimension] - p[j].x[dimension])/magnitude;
+            sum += exp(-magnitude/lrep)*f;
+        }
+    }
+
+    return -crep*sum;
+}
+
+__device__ float prey_friction(Prey *p, int nprey, int dimension)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    float gamma = 0.05;
+    return gamma*p[i].v[dimension];
 }
 
 __global__ void prey_location(Prey *p, int nprey, float dt)
@@ -150,7 +239,7 @@ __global__ void initialise(Prey *p, float *xrandom, float *yrandom, int nprey, f
     return;
 }
 
-__host__ void write(H5PartFile *output, Prey *p, int nprey, int it)
+__host__ void write_prey(H5PartFile *output, Prey *p, int nprey, int it)
 {
     H5PartSetStep(output, it);
 
@@ -161,6 +250,16 @@ __host__ void write(H5PartFile *output, Prey *p, int nprey, int it)
         x[i] = p[i].x[0];
         y[i] = p[i].x[1];
     }
-    H5PartWriteDataFloat32(output, "x", x);
-    H5PartWriteDataFloat32(output, "y", y);
+    H5PartWriteDataFloat32(output, "PreyX", x);
+    H5PartWriteDataFloat32(output, "PreyY", y);
+}
+
+__host__ void write_predator(H5PartFile *output, Predator *p, int it)
+{
+    float x[1] = {p->x[0]};
+    float y[1] = {p->x[1]};
+    
+    H5PartSetStep(output, it);
+    H5PartWriteDataFloat32(output, "PredatorX", x);
+    H5PartWriteDataFloat32(output, "PredatorY", y);
 }
