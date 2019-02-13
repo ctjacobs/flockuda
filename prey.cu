@@ -33,7 +33,7 @@ __device__ void Prey::save()
 __global__ void initialise_prey(Prey *p, float *xrandom, float *yrandom, int nprey, float Lx, float Ly)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    float mass = 10.0;
+    float mass = 1.0;
     if (i < nprey)
     {
         p[i].initialise(mass, Lx*xrandom[i], Ly*yrandom[i]);
@@ -47,7 +47,7 @@ __host__ void write_prey(H5PartFile *output, Prey *p, int nprey, int it)
 
     float x[nprey];
     float y[nprey];
-    for(int i=0; i <= nprey; ++i)
+    for(int i=0; i < nprey; ++i)
     {
         x[i] = p[i].x[0];
         y[i] = p[i].x[1];
@@ -67,7 +67,7 @@ __global__ void save_prey(Prey *p, int nprey)
     return;
 }
 
-__global__ void prey_velocity(Prey *p, int nprey, float dt)
+__global__ void prey_velocity(Prey *p, int nprey, float xp0, float xp1, float *xrandom, float dt)
 {
     float f[2];
 
@@ -77,40 +77,71 @@ __global__ void prey_velocity(Prey *p, int nprey, float dt)
         for(int d=0; d<2; ++d)
         {
             // Compute force terms.
-            f[d] = prey_alignment(p, nprey, d) + prey_attraction(p, nprey, d) + prey_repulsion(p, nprey, d) - prey_friction(p, nprey, d);
+            f[d] = prey_alignment(p, nprey, d) + prey_attraction(p, nprey, d) + prey_repulsion(p, nprey, d) - prey_friction(p, nprey, d) - prey_avoid(p, nprey, xp0, xp1, d);
+            //printf("%f \n", prey_friction(p, nprey, d));
 
             // Compute velocity using F = ma.
-            p[i].v[d] = dt*(p[i].vold[d] + (1.0/p[i].m)*(f[d]));
+            p[i].v[d] = p[i].vold[d] + dt*(f[d]/p[i].m);
         }
     }
 
     return;
 }
 
-
 __global__ void prey_location(Prey *p, int nprey, float dt)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
+    float Lx = 1000.0;
+    float Ly = 1000.0;
     if (i < nprey)
     {
         for(int d=0; d<2; ++d)
         {
             // Compute location solving dx/dt = v.
             p[i].x[d] = p[i].xold[d] + dt*p[i].v[d];
+
+            if(d == 0 && p[i].x[d] > Lx)
+            {
+                p[i].x[d] -= Lx;
+                p[i].v[d] = 0;
+            }
+            else
+            {
+                if (d == 0 && p[i].x[d] < 0)
+                {
+                    p[i].x[d] += Lx;
+                    p[i].v[d] = 0;
+                }
+                else
+                {
+                    if (d == 1 && p[i].x[d] > Ly)
+                    {
+                        p[i].x[d] -= Ly;
+                        p[i].v[d] = 0;
+                    }
+                    else
+                    {
+                        if (d == 1 && p[i].x[d] < 0)
+                        {
+                            p[i].x[d] += Ly;
+                            p[i].v[d] = 0;
+                        }
+                    }
+                }
+            }
         }
     }
-
     return;
 }
 
-__host__ void centre(Prey *p, int nprey, float *c)
+__host__ void prey_centre(Prey *p, int nprey, float *c)
 {
     c[0] = 0;
     c[1] = 0;
-    for(int i=0; i <= nprey; ++i)
+    for(int i=0; i<nprey; ++i)
     {
-        c[0] += p[i].x[0];
-        c[1] += p[i].x[1];
+        c[0] += p[i].xold[0];
+        c[1] += p[i].xold[1];
     }
     c[0] /= nprey;
     c[1] /= nprey;

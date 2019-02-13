@@ -19,3 +19,5 @@ class Predator
 __host__ void initialise_predator(Predator *p);
 __host__ void write_predator(H5PartFile *output, Predator *p, int it);
 __host__ void save_predator(Predator *p);
+__host__ void predator_velocity(Predator *p, float *c, float *xrandom, float dt);
+__host__ void predator_location(Predator *p, float dt);

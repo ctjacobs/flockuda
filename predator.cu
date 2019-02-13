@@ -31,8 +31,8 @@ __host__ void Predator::save()
 
 __host__ void initialise_predator(Predator *p)
 {
-    float kappa = 0.5;
-    p->initialise(kappa, 0, 0, 0.5, 0.5);
+    float kappa = 4.0;
+    p->initialise(kappa, 0, 0, 0, 0);
     return;
 }
 
@@ -50,5 +50,59 @@ __host__ void write_predator(H5PartFile *output, Predator *p, int it)
 __host__ void save_predator(Predator *p)
 {
     p->save();
+    return;
+}
+
+__host__ void predator_velocity(Predator *p, float *c, float *xrandom, float dt)
+{
+    float xpc[2];
+    float magnitude = sqrt(pow(c[0] - p->x[0], 2) + pow(c[1] - p->x[1], 2));
+
+    for(int d=0; d<2; ++d)
+    {
+        xpc[0] = c[0] - p->x[0];
+        xpc[1] = c[1] - p->x[1];
+
+        // Compute velocity using F = ma.
+        p->v[d] = (p->k/dt)*(xpc[d]/magnitude);
+    }
+    return;
+}
+
+__host__ void predator_location(Predator *p, float dt)
+{
+    float Lx = 1000.0;
+    float Ly = 1000.0;
+    for(int d=0; d<2; ++d)
+    {
+        // Compute location solving dx/dt = v.
+        p->x[d] = p->xold[d] + dt*p->v[d];
+
+        if(d == 0 && p->x[d] > Lx)
+        {
+            p->x[d] -= Lx;
+        }
+        else
+        {
+            if (d == 0 && p->x[d] < 0)
+            {
+                p->x[d] += Lx;
+            }
+            else
+            {
+                if (d == 1 && p->x[d] > Ly)
+                {
+                    p->x[d] -= Ly;
+                }
+                else
+                {
+                    if (d == 1 && p->x[d] < 0)
+                    {
+                        p->x[d] += Ly;
+                    }
+                }
+            }
+        }
+    }
     return;
 }

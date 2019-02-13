@@ -19,6 +19,6 @@ class Prey
 __global__ void initialise_prey(Prey *p, float *xrandom, float *yrandom, int nprey, float Lx, float Ly);
 __host__ void write_prey(H5PartFile *output, Prey *p, int nprey, int it);
 __global__ void save_prey(Prey *p, int nprey);
-__global__ void prey_velocity(Prey *p, int nprey, float dt);
+__global__ void prey_velocity(Prey *p, int nprey, float xp0, float xp1, float *xrandom, float dt);
 __global__ void prey_location(Prey *p, int nprey, float dt);
-__host__ void centre(Prey *p, int nprey, float *c);
+__host__ void prey_centre(Prey *p, int nprey, float *c);

@@ -19,11 +19,11 @@ int main()
 
     // Domain.
     float Lx = 1000.0;
-    float Ly = 200.0;
+    float Ly = 1000.0;
 
     // Timestepping.
     float t = 0.0;
-    float dt = 0.5;
+    float dt = 0.2;
     int it = 0;
     int nt = 1000;
 
@@ -35,6 +35,9 @@ int main()
     int nprey = 200;
     Prey *prey;
     cudaMallocManaged(&prey, nprey*sizeof(Prey));
+
+    // Centre of flock.
+    float c[2];
 
     // Random number generator.
     curandGenerator_t generator;
@@ -54,32 +57,41 @@ int main()
     H5PartSetNumParticles(output_predator, 1);
 
     // Initialise.
-    initialise_prey<<<200, 200>>>(prey, xrandom, yrandom, nprey, Lx, Ly);
+    initialise_prey<<<1, nprey>>>(prey, xrandom, yrandom, nprey, Lx, Ly);
     cudaDeviceSynchronize();
     initialise_predator(predator);
+    cudaDeviceSynchronize();
 
+    // Write initial condition.
     write_prey(output_prey, prey, nprey, it);
     write_predator(output_predator, predator, it);
 
-    
+    // Timestepping loop.
     while(it < nt)
     {
-        cout << it << "\t" << t << endl;
+        cout << "Iteration " << it << "\t Time: " << t << endl;
+        cout << prey[0].v[0] << " " << prey[0].v[1] << endl;
+        cout << predator->x[0] << " " << predator->x[1] << endl;
+
+        prey_centre(prey, nprey, c);
 
         // Compute predator velocity.
-        
-
-
-        // Compute prey velocities.
-        prey_velocity<<<200, 200>>>(prey, nprey, dt);
+        predator_velocity(predator, c, xrandom, dt);
         cudaDeviceSynchronize();
-
-        cout << prey[0].v[0] << " " << prey[0].v[1] << endl;
-
-        prey_location<<<200, 200>>>(prey, nprey, dt);
-        save_prey<<<200, 200>>>(prey, nprey);
+        predator_location(predator, dt);
         cudaDeviceSynchronize();
         save_predator(predator);
+        cudaDeviceSynchronize();
+
+        // Compute prey velocities.
+        curandGenerateUniform(generator, xrandom, nprey);
+        cudaDeviceSynchronize();
+        prey_velocity<<<1, nprey>>>(prey, nprey, predator->x[0], predator->x[1], xrandom, dt);
+        cudaDeviceSynchronize();
+        prey_location<<<1, nprey>>>(prey, nprey, dt);
+        cudaDeviceSynchronize();
+        save_prey<<<1, nprey>>>(prey, nprey);
+        cudaDeviceSynchronize();
 
         write_prey(output_prey, prey, nprey, it);
         write_predator(output_predator, predator, it);
