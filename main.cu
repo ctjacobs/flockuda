@@ -54,7 +54,7 @@ int main()
     curandGenerateUniform(generator, xrandom, nprey);
     curandGenerateUniform(generator, yrandom, nprey);
 
-    // Output file streams.
+    // Output file streams in .h5part (HDF5 Particle) format.
     H5PartFile *output_prey = H5PartOpenFile("prey.h5part", H5PART_WRITE);
     H5PartSetNumParticles(output_prey, nprey);
     H5PartFile *output_predator = H5PartOpenFile("predator.h5part", H5PART_WRITE);
@@ -83,7 +83,7 @@ int main()
         predator_location(predator, dt);
         save_predator(predator);
 
-        // Compute prey velocities.
+        // Compute prey velocities on the CUDA-enabled graphics processing unit (GPU).
         prey_velocity<<<1, nprey>>>(prey, nprey, predator->x[0], predator->x[1], dt);
         cudaDeviceSynchronize();
         prey_location<<<1, nprey>>>(prey, nprey, dt);
