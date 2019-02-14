@@ -1,3 +1,11 @@
+/*
+
+Flockuda: A numerical model of predator-prey dynamics based on a Molecular Dynamics approach.
+
+Copyright (C) 2019 Christian Thomas Jacobs
+
+*/
+
 #include "prey.h"
 #include "forces.h"
 
@@ -34,6 +42,8 @@ __global__ void initialise_prey(Prey *p, float *xrandom, float *yrandom, int npr
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     float mass = 1.0;
+
+    // Initialise prey at random locations throughout the domain.
     if (i < nprey)
     {
         p[i].initialise(mass, Lx*xrandom[i], Ly*yrandom[i]);
@@ -43,8 +53,10 @@ __global__ void initialise_prey(Prey *p, float *xrandom, float *yrandom, int npr
 
 __host__ void write_prey(H5PartFile *output, Prey *p, int nprey, int it)
 {
+    // Record the timestep.
     H5PartSetStep(output, it);
 
+    // Collect all prey location data into X and Y arrays.
     float x[nprey];
     float y[nprey];
     for(int i=0; i < nprey; ++i)
@@ -52,6 +64,8 @@ __host__ void write_prey(H5PartFile *output, Prey *p, int nprey, int it)
         x[i] = p[i].x[0];
         y[i] = p[i].x[1];
     }
+
+    // Write to .h5part file.
     H5PartWriteDataFloat32(output, "PreyX", x);
     H5PartWriteDataFloat32(output, "PreyY", y);
 }
@@ -67,20 +81,18 @@ __global__ void save_prey(Prey *p, int nprey)
     return;
 }
 
-__global__ void prey_velocity(Prey *p, int nprey, float xp0, float xp1, float *xrandom, float dt)
+__global__ void prey_velocity(Prey *p, int nprey, float xp0, float xp1, float dt)
 {
-    float f[2];
-
     int i = blockIdx.x * blockDim.x + threadIdx.x;
+    float f[2];  // The force acting on the prey.
     if (i < nprey)
     {
         for(int d=0; d<2; ++d)
         {
             // Compute force terms.
             f[d] = prey_alignment(p, nprey, d) + prey_attraction(p, nprey, d) + prey_repulsion(p, nprey, d) - prey_friction(p, nprey, d) - prey_avoid(p, nprey, xp0, xp1, d);
-            //printf("%f \n", prey_friction(p, nprey, d));
 
-            // Compute velocity using F = ma.
+            // Compute velocity using F = ma as per Equation 1 of Lee et al. (2006).
             p[i].v[d] = p[i].vold[d] + dt*(f[d]/p[i].m);
         }
     }
@@ -97,9 +109,10 @@ __global__ void prey_location(Prey *p, int nprey, float dt)
     {
         for(int d=0; d<2; ++d)
         {
-            // Compute location solving dx/dt = v.
+            // Compute location solving dx/dt = v as per Equation 1 of Lee et al. (2006).
             p[i].x[d] = p[i].xold[d] + dt*p[i].v[d];
 
+            // Apply periodic boundary condition.
             if(d == 0 && p[i].x[d] > Lx)
             {
                 p[i].x[d] -= Lx;
@@ -134,16 +147,17 @@ __global__ void prey_location(Prey *p, int nprey, float dt)
     return;
 }
 
-__host__ void prey_centre(Prey *p, int nprey, float *c)
+__host__ void prey_centre(Prey *p, int nprey, float *centre)
 {
-    c[0] = 0;
-    c[1] = 0;
+    // The centre of the prey flock based on computing the average of all prey locations.
+    centre[0] = 0;
+    centre[1] = 0;
     for(int i=0; i<nprey; ++i)
     {
-        c[0] += p[i].xold[0];
-        c[1] += p[i].xold[1];
+        centre[0] += p[i].xold[0];
+        centre[1] += p[i].xold[1];
     }
-    c[0] /= nprey;
-    c[1] /= nprey;
+    centre[0] /= nprey;
+    centre[1] /= nprey;
     return;
 }

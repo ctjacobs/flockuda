@@ -1,4 +1,6 @@
-/* Flockuda
+/*
+
+Flockuda: A numerical model of predator-prey dynamics based on a Molecular Dynamics approach.
 
 Copyright (C) 2019 Christian Thomas Jacobs
 
@@ -15,13 +17,15 @@ using namespace std;
 
 int main()
 {
+    // All equations solved within are based on those described by Lee et al. (2006), "Prey-Flock Deformation under a Predator's Attack", Journal of the Korean Physical Society, 48:S236--S240.
+
     cout << "Flockuda v1.0.0" << endl;
 
-    // Domain.
+    // Domain specification.
     float Lx = 1000.0;
     float Ly = 1000.0;
 
-    // Timestepping.
+    // Timestepping parameters.
     float t = 0.0;
     float dt = 0.2;
     int it = 0;
@@ -37,7 +41,7 @@ int main()
     cudaMallocManaged(&prey, nprey*sizeof(Prey));
 
     // Centre of flock.
-    float c[2];
+    float centre[2];
 
     // Random number generator.
     curandGenerator_t generator;
@@ -69,30 +73,25 @@ int main()
     // Timestepping loop.
     while(it < nt)
     {
-        cout << "Iteration " << it << "\t Time: " << t << endl;
-        cout << prey[0].v[0] << " " << prey[0].v[1] << endl;
-        cout << predator->x[0] << " " << predator->x[1] << endl;
+        cout << "Iteration " << it << "\t Time: " << t << endl;        
 
-        prey_centre(prey, nprey, c);
+        // Compute the centre of the flock.
+        prey_centre(prey, nprey, centre);
 
         // Compute predator velocity.
-        predator_velocity(predator, c, xrandom, dt);
-        cudaDeviceSynchronize();
+        predator_velocity(predator, centre, xrandom, dt);
         predator_location(predator, dt);
-        cudaDeviceSynchronize();
         save_predator(predator);
-        cudaDeviceSynchronize();
 
         // Compute prey velocities.
-        curandGenerateUniform(generator, xrandom, nprey);
-        cudaDeviceSynchronize();
-        prey_velocity<<<1, nprey>>>(prey, nprey, predator->x[0], predator->x[1], xrandom, dt);
+        prey_velocity<<<1, nprey>>>(prey, nprey, predator->x[0], predator->x[1], dt);
         cudaDeviceSynchronize();
         prey_location<<<1, nprey>>>(prey, nprey, dt);
         cudaDeviceSynchronize();
         save_prey<<<1, nprey>>>(prey, nprey);
         cudaDeviceSynchronize();
 
+        // Write prey and predator positions to file.
         write_prey(output_prey, prey, nprey, it);
         write_predator(output_predator, predator, it);
 

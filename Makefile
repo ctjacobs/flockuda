@@ -1,3 +1,7 @@
+# Flockuda: A numerical model of predator-prey dynamics based on a Molecular Dynamics approach.
+
+# Copyright (C) 2019 Christian Thomas Jacobs
+
 # HDF5
 HDF5_INCLUDE=/usr/include/hdf5/serial/
 HDF5_LIB=/usr/lib/x86_64-linux-gnu/hdf5/serial/

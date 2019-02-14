@@ -1,10 +1,18 @@
+/*
+
+Flockuda: A numerical model of predator-prey dynamics based on a Molecular Dynamics approach.
+
+Copyright (C) 2019 Christian Thomas Jacobs
+
+*/
+
 #include <H5Part.h>
 
 class Predator
 {
     public:
 
-        float k;  // Strength of bias.
+        float k;  // Strength of bias (i.e. speed of attack).
 
         float x[2];  // Location of the predator in two-dimensional space.
         float xold[2];  // Location of the predator in two-dimensional space at the previous timestep.
