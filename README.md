@@ -4,7 +4,7 @@ Flockuda is a predator-prey model that runs on a CUDA-enabled NVIDIA Graphics Pr
 
 ## Dependencies
 
-The [NVIDIA CUDA C compiler](https://developer.nvidia.com/cuda-toolkit) is required in order to compile Flockuda. The [H5Part library](https://code.lbl.gov/projects/h5part/) is also required, since the prey and predator solution fields are written to an .h5part file. Flockuda is known to successfully compile with v9.1.85 of the NVIDIA CUDA C compiler and v1.6.6 of H5Part.
+The [NVIDIA CUDA C compiler](https://developer.nvidia.com/cuda-toolkit) is required in order to compile Flockuda. The [H5Part library](https://code.lbl.gov/projects/h5part/) is also required, since the prey and predator solution fields are written to an .h5part file. Flockuda is known to successfully compile with v9.1.85 of the NVIDIA CUDA C compiler and v1.6.6 of H5Part. Users may need to adjust the paths to the H5Part library in the `Makefile`.
 
 ## Usage
 A simulation can be set up by editing the parameters in `main.cu` and `forces.cu`, then compiling and executing the code by running the following commands at the command line:
