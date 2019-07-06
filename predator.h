@@ -1,10 +1,17 @@
 /*
 
-Flockuda: A numerical model of predator-prey dynamics based on a Molecular Dynamics approach.
+Flockuda: A numerical model of predator-prey dynamics based on the Molecular Dynamics approach of Lee et al. (2006).
 
-Copyright (C) 2019 Christian Thomas Jacobs
+Copyright (C) 2019 Christian T. Jacobs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
+
 
 #include <H5Part.h>
 
@@ -28,4 +35,4 @@ __host__ void initialise_predator(Predator *p);
 __host__ void write_predator(H5PartFile *output, Predator *p, int it);
 __host__ void save_predator(Predator *p);
 __host__ void predator_velocity(Predator *p, float *c, float *xrandom, float dt);
-__host__ void predator_location(Predator *p, float dt);
+__host__ void predator_location(Predator *p, float dt, float Lx, float Ly);

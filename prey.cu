@@ -1,15 +1,23 @@
 /*
 
-Flockuda: A numerical model of predator-prey dynamics based on a Molecular Dynamics approach.
+Flockuda: A numerical model of predator-prey dynamics based on the Molecular Dynamics approach of Lee et al. (2006).
 
-Copyright (C) 2019 Christian Thomas Jacobs
+Copyright (C) 2019 Christian T. Jacobs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
 
+
 #include "prey.h"
 #include "forces.h"
+#include <stdio.h>
 
-__device__ void Prey::initialise(float mass, float x0, float x1)
+__host__ void Prey::initialise(float mass, float x0, float x1)
 {   
     // Mass.
     m = mass;
@@ -27,7 +35,7 @@ __device__ void Prey::initialise(float mass, float x0, float x1)
     return;
 }
 
-__device__ void Prey::save()
+__host__ void Prey::save()
 {   
     // Save information from the previous timestep.
     xold[0] = x[0];
@@ -38,13 +46,13 @@ __device__ void Prey::save()
     return;
 }
 
-__global__ void initialise_prey(Prey *p, float *xrandom, float *yrandom, int nprey, float Lx, float Ly)
+__host__ void initialise_prey(Prey *p, float *xrandom, float *yrandom, int nprey, float Lx, float Ly)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
     float mass = 1.0;
 
     // Initialise prey at random locations throughout the domain.
-    if (i < nprey)
+    for(int i=0; i < nprey; ++i)
     {
         p[i].initialise(mass, Lx*xrandom[i], Ly*yrandom[i]);
     }
@@ -59,21 +67,23 @@ __host__ void write_prey(H5PartFile *output, Prey *p, int nprey, int it)
     // Collect all prey location data into X and Y arrays.
     float x[nprey];
     float y[nprey];
+    float z[nprey];
     for(int i=0; i < nprey; ++i)
     {
         x[i] = p[i].x[0];
         y[i] = p[i].x[1];
+        z[i] = 0;
     }
 
     // Write to .h5part file.
     H5PartWriteDataFloat32(output, "PreyX", x);
     H5PartWriteDataFloat32(output, "PreyY", y);
+    H5PartWriteDataFloat32(output, "PreyZ", z);
 }
 
-__global__ void save_prey(Prey *p, int nprey)
+__host__ void save_prey(Prey *p, int nprey)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < nprey)
+    for(int i=0; i < nprey; ++i)
     {
         p[i].save();
     }
@@ -85,6 +95,7 @@ __global__ void prey_velocity(Prey *p, int nprey, float xp0, float xp1, float dt
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     float f[2];  // The force acting on the prey.
+
     if (i < nprey)
     {
         for(int d=0; d<2; ++d)
@@ -100,11 +111,9 @@ __global__ void prey_velocity(Prey *p, int nprey, float xp0, float xp1, float dt
     return;
 }
 
-__global__ void prey_location(Prey *p, int nprey, float dt)
+__global__ void prey_location(Prey *p, int nprey, float dt, float Lx, float Ly)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    float Lx = 1000.0;
-    float Ly = 1000.0;
     if (i < nprey)
     {
         for(int d=0; d<2; ++d)
