@@ -13,11 +13,27 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 */
 
 
+#include <fstream>
+#include <string>
 #include "configuration.h"
+using namespace std;
 
 
-__device__ float prey_alignment(Prey *p, Configuration config, int dimension);
-__device__ float prey_attraction(Prey *p, Configuration config, int dimension);
-__device__ float prey_repulsion(Prey *p, Configuration config, int dimension);
-__device__ float prey_friction(Prey *p, Configuration config, int dimension);
-__device__ float prey_avoid(Prey *p, Configuration config, float xp0, float xp1, int dimension);
+__host__ void Configuration::read(char *path)
+{   
+    // Open configuration file.
+    ifstream config_file;
+    config_file.open(path);
+
+    // Ignore header line.
+    string header;
+    getline(config_file, header);
+
+    // Read in values.
+    config_file >> Lx >> Ly >> dt >> nt >> nprey >> mass >> kappa >> g >> catt >> latt >> crep >> lrep >> gamma >> cavoid >> omega >> R;
+
+    // Close the file.
+    config_file.close();
+
+    return;
+}

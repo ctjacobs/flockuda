@@ -14,12 +14,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 #include "predator.h"
+#include "configuration.h"
 
-__host__ void Predator::initialise(float kappa, float x0, float x1, float v0, float v1)
-{   
-    // Strength of bias (i.e. speed of attack).
-    k = kappa;
 
+__host__ void Predator::initialise(float x0, float x1, float v0, float v1)
+{
     // Location.
     x[0] = x0;
     x[1] = x1;
@@ -44,10 +43,9 @@ __host__ void Predator::save()
     return;
 }
 
-__host__ void initialise_predator(Predator *p)
+__host__ void initialise_predator(Predator *p, Configuration config)
 {
-    float kappa = 4.0;
-    p->initialise(kappa, 0, 0, 0, 0);
+    p->initialise(0, 0, 0, 0);
     return;
 }
 
@@ -73,47 +71,47 @@ __host__ void save_predator(Predator *p)
     return;
 }
 
-__host__ void predator_velocity(Predator *p, float *c, float *xrandom, float dt)
+__host__ void predator_velocity(Predator *p, Configuration config, float *c, float *xrandom)
 {
     float xpc[2] = {c[0] - p->x[0], c[1] - p->x[1]};
     float magnitude = sqrt(pow(c[0] - p->x[0], 2) + pow(c[1] - p->x[1], 2));
     for(int d=0; d<2; ++d)
     {
         // Compute velocity as per Equation 2 of Lee et al. (2006).
-        p->v[d] = (p->k/dt)*(xpc[d]/magnitude);
+        p->v[d] = (config.kappa/config.dt)*(xpc[d]/magnitude);
     }
     return;
 }
 
-__host__ void predator_location(Predator *p, float dt, float Lx, float Ly)
+__host__ void predator_location(Predator *p, Configuration config)
 {
     for(int d=0; d<2; ++d)
     {
         // Compute location solving dx/dt = v as per Equation 2 of Lee et al. (2006).
-        p->x[d] = p->xold[d] + dt*p->v[d];
+        p->x[d] = p->xold[d] + config.dt*p->v[d];
 
         // Apply periodic boundary condition.
-        if(d == 0 && p->x[d] > Lx)
+        if(d == 0 && p->x[d] > config.Lx)
         {
-            p->x[d] -= Lx;
+            p->x[d] -= config.Lx;
         }
         else
         {
             if (d == 0 && p->x[d] < 0)
             {
-                p->x[d] += Lx;
+                p->x[d] += config.Lx;
             }
             else
             {
-                if (d == 1 && p->x[d] > Ly)
+                if (d == 1 && p->x[d] > config.Ly)
                 {
-                    p->x[d] -= Ly;
+                    p->x[d] -= config.Ly;
                 }
                 else
                 {
                     if (d == 1 && p->x[d] < 0)
                     {
-                        p->x[d] += Ly;
+                        p->x[d] += config.Ly;
                     }
                 }
             }

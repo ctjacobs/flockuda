@@ -17,11 +17,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include "forces.h"
 #include <stdio.h>
 
-__host__ void Prey::initialise(float mass, float x0, float x1)
-{   
-    // Mass.
-    m = mass;
 
+__host__ void Prey::initialise(float x0, float x1)
+{
     // Location.
     x[0] = x0;
     x[1] = x1;
@@ -46,29 +44,26 @@ __host__ void Prey::save()
     return;
 }
 
-__host__ void initialise_prey(Prey *p, float *xrandom, float *yrandom, int nprey, float Lx, float Ly)
+__host__ void initialise_prey(Prey *p, Configuration config, float *xrandom, float *yrandom)
 {
-
-    float mass = 1.0;
-
     // Initialise prey at random locations throughout the domain.
-    for(int i=0; i < nprey; ++i)
+    for(int i=0; i < config.nprey; ++i)
     {
-        p[i].initialise(mass, Lx*xrandom[i], Ly*yrandom[i]);
+        p[i].initialise(config.Lx*xrandom[i], config.Ly*yrandom[i]);
     }
     return;
 }
 
-__host__ void write_prey(H5PartFile *output, Prey *p, int nprey, int it)
+__host__ void write_prey(H5PartFile *output, Prey *p, Configuration config, int it)
 {
     // Record the timestep.
     H5PartSetStep(output, it);
 
     // Collect all prey location data into X and Y arrays.
-    float x[nprey];
-    float y[nprey];
-    float z[nprey];
-    for(int i=0; i < nprey; ++i)
+    float x[config.nprey];
+    float y[config.nprey];
+    float z[config.nprey];
+    for(int i=0; i < config.nprey; ++i)
     {
         x[i] = p[i].x[0];
         y[i] = p[i].x[1];
@@ -81,9 +76,9 @@ __host__ void write_prey(H5PartFile *output, Prey *p, int nprey, int it)
     H5PartWriteDataFloat32(output, "PreyZ", z);
 }
 
-__host__ void save_prey(Prey *p, int nprey)
+__host__ void save_prey(Prey *p, Configuration config)
 {
-    for(int i=0; i < nprey; ++i)
+    for(int i=0; i < config.nprey; ++i)
     {
         p[i].save();
     }
@@ -91,61 +86,61 @@ __host__ void save_prey(Prey *p, int nprey)
     return;
 }
 
-__global__ void prey_velocity(Prey *p, int nprey, float xp0, float xp1, float dt)
+__global__ void prey_velocity(Prey *p, Configuration config, float xp0, float xp1)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     float f[2];  // The force acting on the prey.
 
-    if (i < nprey)
+    if (i < config.nprey)
     {
         for(int d=0; d<2; ++d)
         {
             // Compute force terms.
-            f[d] = prey_alignment(p, nprey, d) + prey_attraction(p, nprey, d) + prey_repulsion(p, nprey, d) - prey_friction(p, nprey, d) - prey_avoid(p, nprey, xp0, xp1, d);
+            f[d] = prey_alignment(p, config, d) + prey_attraction(p, config, d) + prey_repulsion(p, config, d) - prey_friction(p, config, d) - prey_avoid(p, config, xp0, xp1, d);
 
             // Compute velocity using F = ma as per Equation 1 of Lee et al. (2006).
-            p[i].v[d] = p[i].vold[d] + dt*(f[d]/p[i].m);
+            p[i].v[d] = p[i].vold[d] + config.dt*(f[d]/config.mass);
         }
     }
 
     return;
 }
 
-__global__ void prey_location(Prey *p, int nprey, float dt, float Lx, float Ly)
+__global__ void prey_location(Prey *p, Configuration config)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < nprey)
+    if (i < config.nprey)
     {
         for(int d=0; d<2; ++d)
         {
             // Compute location solving dx/dt = v as per Equation 1 of Lee et al. (2006).
-            p[i].x[d] = p[i].xold[d] + dt*p[i].v[d];
+            p[i].x[d] = p[i].xold[d] + config.dt*p[i].v[d];
 
             // Apply periodic boundary condition.
-            if(d == 0 && p[i].x[d] > Lx)
+            if(d == 0 && p[i].x[d] > config.Lx)
             {
-                p[i].x[d] -= Lx;
+                p[i].x[d] -= config.Lx;
                 p[i].v[d] = 0;
             }
             else
             {
                 if (d == 0 && p[i].x[d] < 0)
                 {
-                    p[i].x[d] += Lx;
+                    p[i].x[d] += config.Lx;
                     p[i].v[d] = 0;
                 }
                 else
                 {
-                    if (d == 1 && p[i].x[d] > Ly)
+                    if (d == 1 && p[i].x[d] > config.Ly)
                     {
-                        p[i].x[d] -= Ly;
+                        p[i].x[d] -= config.Ly;
                         p[i].v[d] = 0;
                     }
                     else
                     {
                         if (d == 1 && p[i].x[d] < 0)
                         {
-                            p[i].x[d] += Ly;
+                            p[i].x[d] += config.Ly;
                             p[i].v[d] = 0;
                         }
                     }
@@ -156,17 +151,17 @@ __global__ void prey_location(Prey *p, int nprey, float dt, float Lx, float Ly)
     return;
 }
 
-__host__ void prey_centre(Prey *p, int nprey, float *centre)
+__host__ void prey_centre(Prey *p, Configuration config, float *centre)
 {
     // The centre of the prey flock based on computing the average of all prey locations.
     centre[0] = 0;
     centre[1] = 0;
-    for(int i=0; i<nprey; ++i)
+    for(int i=0; i<config.nprey; ++i)
     {
         centre[0] += p[i].xold[0];
         centre[1] += p[i].xold[1];
     }
-    centre[0] /= nprey;
-    centre[1] /= nprey;
+    centre[0] /= config.nprey;
+    centre[1] /= config.nprey;
     return;
 }

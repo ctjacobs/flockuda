@@ -13,11 +13,45 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 */
 
 
-#include "configuration.h"
+#pragma once
 
 
-__device__ float prey_alignment(Prey *p, Configuration config, int dimension);
-__device__ float prey_attraction(Prey *p, Configuration config, int dimension);
-__device__ float prey_repulsion(Prey *p, Configuration config, int dimension);
-__device__ float prey_friction(Prey *p, Configuration config, int dimension);
-__device__ float prey_avoid(Prey *p, Configuration config, float xp0, float xp1, int dimension);
+class Configuration
+{
+    public:
+
+        // Domain specification.
+        float Lx;
+        float Ly;
+
+        // Timestepping parameters.
+        float dt;
+        int nt;
+
+        // Number of prey.
+        int nprey;
+
+        // The mass of each prey.
+        float mass;
+
+        // Strength of bias (i.e. speed of attack).
+        float kappa;
+
+        float g;
+
+        // Attraction coefficients.
+        float catt;
+        float latt;  // Range of attractive forces.
+
+        // Repulsion coefficients.
+        float crep;
+        float lrep;  // Range of repulsive forces.
+
+        float gamma;
+
+        float cavoid;
+        float omega;  // Scaling factor based on predator size.
+        float R;  // Risk radius.
+
+        __host__ void read(char *path);
+};

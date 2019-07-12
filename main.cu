@@ -17,35 +17,35 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include <H5Part.h>
 #include <cuda.h>
 #include <curand.h>
+#include <cassert>
+#include "configuration.h"
 #include "predator.h"
 #include "prey.h"
 using namespace std;
 
 
-int main()
+int main(int argc, char **argv)
 {
     // All equations solved within are based on those described by Lee et al. (2006), "Prey-Flock Deformation under a Predator's Attack", Journal of the Korean Physical Society, 48:S236--S240.
 
     cout << "Flockuda v1.0.0" << endl;
 
-    // Domain specification.
-    float Lx = 1000.0;
-    float Ly = 1000.0;
+    // Read in the simulation's configuration from a file.
+    assert(argc == 2);
+    Configuration config;
+    config.read(argv[1]);
 
-    // Timestepping parameters.
+    // Initialise timestepping variables.
     float t = 0.0;
-    float dt = 0.2;
     int it = 0;
-    int nt = 1000;
 
     // Predator.
     Predator *predator;
     cudaMallocManaged(&predator, sizeof(Predator));
 
     // Prey.
-    int nprey = 200;
     Prey *prey;
-    cudaMallocManaged(&prey, nprey*sizeof(Prey));
+    cudaMallocManaged(&prey, config.nprey*sizeof(Prey));
 
     // Centre of flock.
     float centre[2];
@@ -54,58 +54,58 @@ int main()
     curandGenerator_t generator;
     float *xrandom;
     float *yrandom;
-    cudaMallocManaged(&xrandom, nprey*sizeof(float));
-    cudaMallocManaged(&yrandom, nprey*sizeof(float));
+    cudaMallocManaged(&xrandom, config.nprey*sizeof(float));
+    cudaMallocManaged(&yrandom, config.nprey*sizeof(float));
     curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_MTGP32);
     curandSetPseudoRandomGeneratorSeed(generator, unsigned(time(NULL)));
-    curandGenerateUniform(generator, xrandom, nprey);
-    curandGenerateUniform(generator, yrandom, nprey);
+    curandGenerateUniform(generator, xrandom, config.nprey);
+    curandGenerateUniform(generator, yrandom, config.nprey);
 
     // Output file streams in .h5part (HDF5 Particle) format.
     H5PartFile *output_prey = H5PartOpenFile("prey.h5part", H5PART_WRITE);
-    H5PartSetNumParticles(output_prey, nprey);
+    H5PartSetNumParticles(output_prey, config.nprey);
     H5PartFile *output_predator = H5PartOpenFile("predator.h5part", H5PART_WRITE);
     H5PartSetNumParticles(output_predator, 1);
 
     // Initialise.
     cudaDeviceSynchronize();
-    initialise_prey(prey, xrandom, yrandom, nprey, Lx, Ly);
+    initialise_prey(prey, config, xrandom, yrandom);
     cudaDeviceSynchronize();
-    initialise_predator(predator);
+    initialise_predator(predator, config);
     cudaDeviceSynchronize();
 
     // Write initial condition.
-    write_prey(output_prey, prey, nprey, it);
+    write_prey(output_prey, prey, config, it);
     write_predator(output_predator, predator, it);
 
     // Timestepping loop.
-    while(it < nt)
+    while(it < config.nt)
     {
         cout << "Iteration " << it << "\t Time: " << t << endl;        
 
         // Compute the centre of the flock.
-        prey_centre(prey, nprey, centre);
+        prey_centre(prey, config, centre);
 
         // Compute predator velocity.
-        predator_velocity(predator, centre, xrandom, dt);
-        predator_location(predator, dt, Lx, Ly);
+        predator_velocity(predator, config, centre, xrandom);
+        predator_location(predator, config);
         save_predator(predator);
 
         // Compute prey velocities on the CUDA-enabled graphics processing unit (GPU).
-        prey_velocity<<<1, nprey>>>(prey, nprey, predator->x[0], predator->x[1], dt);
+        prey_velocity<<<1, config.nprey>>>(prey, config, predator->x[0], predator->x[1]);
         cudaDeviceSynchronize();
-        prey_location<<<1, nprey>>>(prey, nprey, dt, Lx, Ly);
+        prey_location<<<1, config.nprey>>>(prey, config);
         cudaDeviceSynchronize();
-        save_prey(prey, nprey);
+        save_prey(prey, config);
         cudaDeviceSynchronize();
 
         // Write prey and predator positions to file.
-        write_prey(output_prey, prey, nprey, it);
+        write_prey(output_prey, prey, config, it);
         write_predator(output_predator, predator, it);
 
         // Update time.
         it += 1;
-        t += dt;
+        t += config.dt;
     }
 
     // Free unified memory.

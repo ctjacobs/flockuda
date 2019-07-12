@@ -15,6 +15,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 #include <H5Part.h>
 #include <stdio.h>
+#include "configuration.h"
+
 
 class Prey
 {
@@ -28,13 +30,13 @@ class Prey
         float v[2];  // Velocity of the prey.
         float vold[2];  // Velocity of the prey at the previous timestep.
 
-        __host__ void initialise(float mass, float x0, float x1);
+        __host__ void initialise(float x0, float x1);
         __host__ void save();
 };
 
-__host__ void initialise_prey(Prey *p, float *xrandom, float *yrandom, int nprey, float Lx, float Ly);
-__host__ void write_prey(H5PartFile *output, Prey *p, int nprey, int it);
-__host__ void save_prey(Prey *p, int nprey);
-__global__ void prey_velocity(Prey *p, int nprey, float xp0, float xp1, float dt);
-__global__ void prey_location(Prey *p, int nprey, float dt, float Lx, float Ly);
-__host__ void prey_centre(Prey *p, int nprey, float *centre);
+__host__ void initialise_prey(Prey *p, Configuration config, float *xrandom, float *yrandom);
+__host__ void write_prey(H5PartFile *output, Prey *p, Configuration config, int it);
+__host__ void save_prey(Prey *p, Configuration config);
+__global__ void prey_velocity(Prey *p, Configuration config, float xp0, float xp1);
+__global__ void prey_location(Prey *p, Configuration config);
+__host__ void prey_centre(Prey *p, Configuration config, float *centre);
