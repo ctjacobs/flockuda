@@ -14,6 +14,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 #include <iostream>
+#include <fstream>
 #include <H5Part.h>
 #include <cuda.h>
 #include <curand.h>
@@ -33,7 +34,16 @@ int main(int argc, char **argv)
     // Read in the simulation's configuration from a file.
     assert(argc == 2);
     Configuration config;
-    config.read(argv[1]);
+    #if DEBUG
+        config.read("tests/test.cfg");
+        assert(config.Lx == 10.0);
+        assert(config.Ly == 20.0);
+        assert(config.mass == 1.0);
+        assert(config.nprey == 200);
+        assert(config.R == 100.0);
+    #else
+        config.read(argv[1]);
+    #endif
 
     // Initialise timestepping variables.
     float t = 0.0;
@@ -107,6 +117,25 @@ int main(int argc, char **argv)
         it += 1;
         t += config.dt;
     }
+
+    #if DEBUG
+        // Check that the predator's position has not changed.
+        assert(predator->x[0] == 0);
+        assert(predator->x[1] == 0);
+
+        // Check finish time and iteration count.
+        assert(it == 1);
+        assert(fabs(t - 0.2) < 1e-6);
+
+        // Check output files exist.
+        ifstream f;
+        f.open("predator.h5part");
+        assert(f.good());
+        f.close();
+        f.open("prey.h5part");
+        assert(f.good());
+        f.close();
+    #endif
 
     // Free unified memory.
     cudaFree(predator);
